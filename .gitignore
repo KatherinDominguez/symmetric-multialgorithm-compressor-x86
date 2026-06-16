@@ -1,0 +1,12 @@
+# .gitignore
+build/
+*.exe
+*.obj
+*.o
+*.rle
+*.huff
+*.pdb
+*.ilk
+*.user
+.vs/
+__pycache__/
