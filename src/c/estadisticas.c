@@ -3,6 +3,8 @@
 #include <windows.h>
 #include "estadisticas.h"
 #include "../../include/contratos.h"
+extern double g_ratio_compresion;
+extern double g_porcentaje_ahorro;
 
 // ─────────────────────────────────────────────────────────────────────
 //  INTERNO: mide el tiempo actual en microsegundos usando la API
@@ -47,13 +49,9 @@ ResultadoEstadisticas fpu_CalcularEstadisticas(uint64_t tam_original,
     // ── Fallback C (activo hasta que llegue el .asm real) ─────────
     // Cuando el Estudiante D entregue su módulo, este bloque
     // se reemplaza por leer las variables que él escribió.
-    if (tam_original > 0) {
-        est.ratio_compresion  = (double)tam_comprimido / (double)tam_original;
-        est.porcentaje_ahorro = (1.0 - est.ratio_compresion) * 100.0;
-    } else {
-        est.ratio_compresion  = 0.0;
-        est.porcentaje_ahorro = 0.0;
-    }
+    est.ratio_compresion  = g_ratio_compresion;
+
+    est.porcentaje_ahorro = g_porcentaje_ahorro;
 
     // ── Velocidad ─────────────────────────────────────────────────
     // tam_original en KB / tiempo en segundos
