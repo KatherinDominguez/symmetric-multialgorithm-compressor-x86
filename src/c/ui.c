@@ -126,23 +126,3 @@ void ui_mostrar_barra_progreso(int porcentaje) {
     printf("] " COLOR_YELLOW "%3d%%" COLOR_RESET, porcentaje);
     fflush(stdout);
 }
-
-void ui_mostrar_modulos_pendientes(void) {
-    printf(COLOR_YELLOW
-           "\n"
-           "    +================================+\n"
-           "    |     MODULOS EN DESARROLLO      |\n"
-           "    +================================+\n"
-           "    |  [✓] Modulo E - CLI/Decomp.    |\n"
-           "    |  [ ] Modulo A - Memoria        |\n"
-           "    |  [ ] Modulo B - Archivos       |\n"
-           "    |  [ ] Modulo C - Compresor      |\n"
-           "    |  [ ] Modulo D - FPU Stats      |\n"
-           "    +================================+\n"
-           "    |  Huffman disponible cuando     |\n"
-           "    |  Modulo C sea integrado        |\n"
-           "    +================================+\n"
-           COLOR_RESET);
-    printf("\n    Presione Enter para continuar...");
-    getchar();
-}

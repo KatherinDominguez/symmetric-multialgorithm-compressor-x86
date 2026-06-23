@@ -234,32 +234,30 @@ ResultadoDescompresion des_DescomprimirFlujo(const char* ruta_entrada) {
         return res;
     }
 
-    printf("[des] Firma detectada : %.4s\n",  cabecera.firma);
-    printf("[des] Extension orig  : %s\n",    cabecera.extension);
-    printf("[des] Tam original    : %llu B\n", cabecera.tam_original);
-    printf("[des] Tam comprimido  : %llu B\n", cabecera.tam_datos);
-
     // ── Delegar según algoritmo ────────────────────────────────────
     if (memcmp(cabecera.firma, "RLE_", 4) == 0) {
-        res = des_expandir_rle(datos_comprimidos, tam_comprimidos, cabecera.tam_original);
+        res = des_expandir_rle(datos_comprimidos, tam_comprimidos,
+                               cabecera.tam_original);
+        free(datos_comprimidos);
+        return res;
 
     } else if (memcmp(cabecera.firma, "HUFF", 4) == 0) {
-        // Los primeros 2048 bytes del bloque de datos son la tabla de frecuencias
-        size_t tam_tabla   = 256 * sizeof(uint64_t);   // 2048 bytes
+        size_t tam_tabla   = 256 * sizeof(uint64_t);
         uint8_t* bitstream = datos_comprimidos + tam_tabla;
         size_t   tam_bits  = tam_comprimidos   - tam_tabla;
 
         res = des_expandir_huffman(bitstream, tam_bits,
                                    datos_comprimidos, tam_tabla);
+        free(datos_comprimidos);
+        return res;
+
     } else {
         fprintf(stderr, "[des] Algoritmo desconocido\n");
         res.error = 10;
+        free(datos_comprimidos);
+        return res;
     }
-
-    free(datos_comprimidos);
-    return res;
 }
-
 // ─────────────────────────────────────────────────────────────────────
 void des_liberar(ResultadoDescompresion* r) {
     if (r && r->datos) {

@@ -13,7 +13,8 @@ extern void  mem_LiberarMemoria(void* ptr, size_t tamano);
 extern size_t comp_ComprimirBufferHuffman(
     const uint8_t* entrada,   // RCX
     size_t         tamano,    // RDX
-    uint8_t*       salida     // R8
+    uint8_t*       salida,     // R8
+    const uint8_t* diccionario   // R9
 );
 extern size_t comp_ComprimirBufferRLE(
     const uint8_t* entrada,

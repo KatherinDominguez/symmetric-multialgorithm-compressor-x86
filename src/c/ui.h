@@ -9,6 +9,5 @@ void ui_mostrar_mensaje(const char* msg);
 void ui_mostrar_error(const char* msg);
 void ui_mostrar_barra_progreso(int porcentaje);
 void ui_limpiar_pantalla(void);
-void ui_mostrar_modulos_pendientes(void);
 
 #endif

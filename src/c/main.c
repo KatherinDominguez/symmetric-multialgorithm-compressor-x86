@@ -1,3 +1,7 @@
+// =========================================================
+// Archivo: main.c
+// =========================================================
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,11 +10,11 @@
 #include "archivos.h"
 #include "descompresor.h"
 #include "estadisticas.h"
+#include "huffman.h"
 #include "../../include/contratos.h"
 
 int main(void) {
     ui_configurar_consola();
-    ui_mostrar_modulos_pendientes();
 
     int opcion = 0;
     char ruta_entrada[480];
@@ -22,41 +26,37 @@ int main(void) {
         switch (opcion) {
 
             // ─────────────────────────────────────────────────────────
+            // Caso 1: Comprimir archivo
+            // ─────────────────────────────────────────────────────────
             case 1: {
                 ui_solicitar_ruta("Archivo a comprimir",
                                   ruta_entrada, sizeof(ruta_entrada));
 
-                // Leer archivo original
+                // --- Lectura del archivo original ---
                 ResultadoLectura archivo = file_LeerArchivoCompleto(ruta_entrada);
                 if (archivo.error != 0) {
                     ui_mostrar_error("No se pudo leer el archivo.");
                     break;
                 }
 
-                // Preguntar algoritmo
+                // --- Selección de algoritmo de compresión ---
                 ui_mostrar_submenu_algoritmo();
                 int algoritmo = 0;
                 scanf("%d", &algoritmo);
                 while (getchar() != '\n');
 
-                // Si elige Huffman, avisar que está pendiente y forzar RLE
-                if (algoritmo == 2) {
-                    ui_mostrar_modulos_pendientes();
-                    algoritmo = 1;
-                }
-
-                // Reservar buffer de salida
-                uint8_t* buffer_salida = (uint8_t*)malloc(archivo.tamano * 2);
+                // --- Reserva del buffer de salida (margen x2 + tabla Huffman) ---
+                uint8_t* buffer_salida = (uint8_t*)malloc(archivo.tamano * 2 + 2048);
                 if (!buffer_salida) {
                     ui_mostrar_error("Sin memoria para comprimir.");
                     file_liberar(&archivo);
                     break;
                 }
 
-                // Tomar tiempo ANTES
+                // --- Inicio de medición de tiempo ---
                 uint64_t t_inicio = fpu_obtener_timestamp();
 
-                // Barra de progreso visual
+                // --- Barra de progreso visual ---
                 printf("\n    Procesando...\n    ");
                 for (int p = 0; p <= 100; p += 10) {
                     ui_mostrar_barra_progreso(p);
@@ -64,67 +64,77 @@ int main(void) {
                 }
                 printf("\n");
 
-                // Comprimir
+                // --- Preparación de cabecera y rutas ---
                 size_t tam_comprimido = 0;
                 CabeceraArchivo cab;
                 memset(&cab, 0, sizeof(cab));
 
                 const char* ext = file_obtener_extension(ruta_entrada);
-
-                // Construir nombre: quitar extensión original y agregar _comprimido.rle
-                // Ejemplo: "C:\Downloads\foto.bmp" → "C:\Downloads\foto_comprimido.rle"
                 char ruta_sin_ext[480] = {0};
                 snprintf(ruta_sin_ext, sizeof(ruta_sin_ext), "%s", ruta_entrada);
-
                 char* ultimo_punto = strrchr(ruta_sin_ext, '.');
                 if (ultimo_punto) *ultimo_punto = '\0';
 
-                // TEMPORAL: solo RLE hasta que Estudiante C entregue módulo real
-                memcpy(cab.firma, "RLE_", 4);
-                tam_comprimido = comp_ComprimirBufferRLE(
-                    archivo.datos, archivo.tamano, buffer_salida);
-                snprintf(ruta_salida, sizeof(ruta_salida),
-                         "%s_comprimido.rle", ruta_sin_ext);
+                if (algoritmo == 2) {
+                    // ── Huffman ───────────────────────────────────────
+                    memcpy(cab.firma, "HUFF", 4);
 
-                // TODO: descomentar cuando Estudiante C entregue su módulo
-                // if (algoritmo == 1) {
-                //     memcpy(cab.firma, "HUFF", 4);
-                //     tam_comprimido = comp_ComprimirBufferHuffman(
-                //         archivo.datos, archivo.tamano, buffer_salida);
-                //     snprintf(ruta_salida, sizeof(ruta_salida),
-                //              "%s_comprimido.huff", ruta_sin_ext);
-                // } else {
-                //     memcpy(cab.firma, "RLE_", 4);
-                //     tam_comprimido = comp_ComprimirBufferRLE(
-                //         archivo.datos, archivo.tamano, buffer_salida);
-                //     snprintf(ruta_salida, sizeof(ruta_salida),
-                //              "%s_comprimido.rle", ruta_sin_ext);
-                // }
+                    // Paso 1: Construir diccionario de códigos
+                    HuffmanCode* diccionario = huffman_construir_diccionario(
+                        archivo.datos, archivo.tamano);
+                    if (!diccionario) {
+                        ui_mostrar_error("Sin memoria para diccionario Huffman.");
+                        free(buffer_salida);
+                        file_liberar(&archivo);
+                        break;
+                    }
 
-                // Silenciar warning mientras el if/else está comentado
-                (void)algoritmo;
+                    // Paso 2: Escribir tabla de frecuencias en cabecera extra (2048 B)
+                    huffman_escribir_tabla_frecuencias(
+                        archivo.datos, archivo.tamano, buffer_salida);
 
-                // Tomar tiempo DESPUÉS
+                    // Paso 3: Comprimir bitstream con el módulo ASM
+                    size_t tam_bits = comp_ComprimirBufferHuffman(
+                        archivo.datos,
+                        archivo.tamano,
+                        buffer_salida + 2048,
+                        (uint8_t*)diccionario
+                    );
+
+                    tam_comprimido = 2048 + tam_bits;
+                    snprintf(ruta_salida, sizeof(ruta_salida),
+                             "%s_comprimido.huff", ruta_sin_ext);
+                    free(diccionario);
+
+                } else {
+                    // ── RLE ───────────────────────────────────────────
+                    memcpy(cab.firma, "RLE_", 4);
+                    tam_comprimido = comp_ComprimirBufferRLE(
+                        archivo.datos, archivo.tamano, buffer_salida);
+                    snprintf(ruta_salida, sizeof(ruta_salida),
+                             "%s_comprimido.rle", ruta_sin_ext);
+                }
+
+                // --- Fin de medición de tiempo ---
                 uint64_t t_fin         = fpu_obtener_timestamp();
                 uint64_t microsegundos = t_fin - t_inicio;
 
-                // Completar cabecera
+                // --- Completar cabecera y escribir archivo comprimido ---
                 strncpy(cab.extension, ext, 15);
                 cab.extension[15]  = '\0';
                 cab.ext_len        = (uint32_t)strlen(ext);
                 cab.tam_original   = (uint64_t)archivo.tamano;
                 cab.tam_datos      = (uint64_t)tam_comprimido;
 
-                // Guardar archivo comprimido
                 int err = file_EscribirArchivoComprimido(
                               ruta_salida, &cab,
                               buffer_salida, tam_comprimido);
 
+                // --- Mostrar resultado y estadísticas ---
                 if (err != 0) {
                     ui_mostrar_error("No se pudo guardar el archivo comprimido.");
                 } else {
                     printf("\n    Archivo guardado en:\n    %s\n", ruta_salida);
-
                     ResultadoEstadisticas est = fpu_CalcularEstadisticas(
                         archivo.tamano, tam_comprimido, microsegundos);
                     fpu_mostrar_estadisticas(&est);
@@ -137,11 +147,13 @@ int main(void) {
             }
 
             // ─────────────────────────────────────────────────────────
+            // Caso 2: Descomprimir archivo
+            // ─────────────────────────────────────────────────────────
             case 2: {
                 ui_solicitar_ruta("Archivo a descomprimir (.huff o .rle)",
                                   ruta_entrada, sizeof(ruta_entrada));
 
-                // Leer cabecera para obtener extensión original y tamaños
+                // --- Lectura de cabecera para obtener extensión original ---
                 CabeceraArchivo cab;
                 uint8_t* datos_comp = NULL;
                 size_t   tam_comp   = 0;
@@ -154,7 +166,7 @@ int main(void) {
                     break;
                 }
 
-                // Barra de progreso visual
+                // --- Barra de progreso visual ---
                 printf("\n    Procesando...\n    ");
                 for (int p = 0; p <= 100; p += 10) {
                     ui_mostrar_barra_progreso(p);
@@ -162,7 +174,7 @@ int main(void) {
                 }
                 printf("\n");
 
-                // Descomprimir
+                // --- Descompresión y medición de tiempo ---
                 uint64_t t_inicio      = fpu_obtener_timestamp();
                 ResultadoDescompresion resultado = des_DescomprimirFlujo(ruta_entrada);
                 uint64_t t_fin         = fpu_obtener_timestamp();
@@ -175,24 +187,20 @@ int main(void) {
                     break;
                 }
 
-                // Construir nombre único basado en el archivo comprimido
-                // Ejemplo: "C:\Downloads\foto_comprimido.rle" → "C:\Downloads\foto_restaurado.bmp"
+                // --- Reconstrucción de la ruta de salida ---
                 char nombre_base[480] = {0};
                 snprintf(nombre_base, sizeof(nombre_base), "%s", ruta_entrada);
 
-                // Quitar extensión .rle o .huff
                 char* ultimo_punto = strrchr(nombre_base, '.');
                 if (ultimo_punto) *ultimo_punto = '\0';
 
-                // Quitar sufijo "_comprimido" si existe
                 char* sufijo = strstr(nombre_base, "_comprimido");
                 if (sufijo) *sufijo = '\0';
 
-                // Construir ruta final con _restaurado + extensión original
                 snprintf(ruta_salida, sizeof(ruta_salida),
                          "%s_restaurado%s", nombre_base, cab.extension);
 
-                // Guardar archivo restaurado
+                // --- Escritura del archivo restaurado ---
                 FILE* f_out = fopen(ruta_salida, "wb");
                 if (!f_out) {
                     ui_mostrar_error("No se pudo crear el archivo restaurado.");
@@ -203,6 +211,7 @@ int main(void) {
                 fwrite(resultado.datos, 1, resultado.tamano, f_out);
                 fclose(f_out);
 
+                // --- Mostrar resultado y estadísticas ---
                 printf("\n    Archivo restaurado en:\n    %s\n", ruta_salida);
 
                 ResultadoEstadisticas est = fpu_CalcularEstadisticas(
@@ -215,10 +224,15 @@ int main(void) {
             }
 
             // ─────────────────────────────────────────────────────────
+            // Caso 3: Salir del programa
+            // ─────────────────────────────────────────────────────────
             case 3:
                 ui_mostrar_mensaje("Saliendo...");
                 break;
 
+            // ─────────────────────────────────────────────────────────
+            // Opción inválida
+            // ─────────────────────────────────────────────────────────
             default:
                 ui_mostrar_error("Opcion invalida. Intente de nuevo.");
                 break;

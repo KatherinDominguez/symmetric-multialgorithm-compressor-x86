@@ -15,12 +15,13 @@ OBJ_C = $(BUILD)/main.o         \
         $(BUILD)/ui.o           \
         $(BUILD)/archivos.o     \
         $(BUILD)/descompresor.o \
-        $(BUILD)/estadisticas.o
+        $(BUILD)/estadisticas.o \
+        $(BUILD)/huffman.o
 
-# ─── Objetos ASM (stubs hasta que compañeros entreguen) ──────────────
-OBJ_ASM = $(BUILD)/stub_memoria.o   \
-          $(BUILD)/stub_compresor.o  \
-          $(BUILD)/stub_fpu.o
+# ─── Objetos ASM ─────────────────────────────────────────────────────
+OBJ_ASM = $(BUILD)/memoria.o    \
+          $(BUILD)/compresor.o  \
+          $(BUILD)/fpu_stats.o
 
 TARGET = compresor.exe
 
@@ -46,14 +47,17 @@ $(BUILD)/descompresor.o: $(SRC_C)/descompresor.c
 $(BUILD)/estadisticas.o: $(SRC_C)/estadisticas.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# ─── Compilar stubs ASM ──────────────────────────────────────────────
-$(BUILD)/stub_memoria.o: $(STUBS)/stub_memoria.asm
+# ─── Compilar módulos ASM reales ─────────────────────────────────────
+$(BUILD)/memoria.o: $(SRC_ASM)/memoria.asm
 	$(NASM) $(NASMFLAGS) $< -o $@
 
-$(BUILD)/stub_compresor.o: $(STUBS)/stub_compresor.asm
+$(BUILD)/compresor.o: $(SRC_ASM)/compresor.asm
 	$(NASM) $(NASMFLAGS) $< -o $@
 
-$(BUILD)/stub_fpu.o: $(STUBS)/stub_fpu.asm
+$(BUILD)/huffman.o: $(SRC_C)/huffman.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/fpu_stats.o: $(SRC_ASM)/fpu_stats.asm
 	$(NASM) $(NASMFLAGS) $< -o $@
 
 # ─── Enlazar todo ────────────────────────────────────────────────────
