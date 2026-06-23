@@ -20,7 +20,7 @@ OBJ_C = $(BUILD)/main.o         \
 # ─── Objetos ASM (stubs hasta que compañeros entreguen) ──────────────
 OBJ_ASM = $(BUILD)/stub_memoria.o   \
           $(BUILD)/stub_compresor.o  \
-          $(BUILD)/stub_fpu.o
+          $(BUILD)/fpu_stats.o
 
 TARGET = compresor.exe
 
@@ -53,7 +53,7 @@ $(BUILD)/stub_memoria.o: $(STUBS)/stub_memoria.asm
 $(BUILD)/stub_compresor.o: $(STUBS)/stub_compresor.asm
 	$(NASM) $(NASMFLAGS) $< -o $@
 
-$(BUILD)/stub_fpu.o: $(STUBS)/stub_fpu.asm
+$(BUILD)/fpu_stats.o: $(SRC_ASM)/fpu_stats.asm
 	$(NASM) $(NASMFLAGS) $< -o $@
 
 # ─── Enlazar todo ────────────────────────────────────────────────────
